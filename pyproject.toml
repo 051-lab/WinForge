@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "winforge"
+version = "0.1.0"
+description = "A self-improving Windows 10/11 desktop app"
+requires-python = ">=3.11"
+dependencies = [
+    "customtkinter>=5.2",
+    "loguru>=0.7",
+    "tufup>=0.10",
+    "pyinstaller>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "pytest-cov"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
