@@ -1,14 +1,11 @@
 """WinForge telemetry - privacy-respecting opt-in usage tracking."""
 from __future__ import annotations
-
 import json
 import platform
 import uuid
 from pathlib import Path
 from typing import Any, Dict
-
 from loguru import logger
-
 import app
 
 _STATE_FILE = Path("config/telemetry.json")
@@ -51,21 +48,20 @@ def set_enabled(value: bool) -> None:
 
 def get_install_id() -> str | None:
     """Return the anonymous install UUID, or None if not opted in."""
-    if not is_enabled():
+    state = _load_state()
+    if not state.get(_CONSENT_KEY, False):
         return None
-    return _load_state().get("install_id")
+    return state.get("install_id")
 
 
 def collect_event(event: str, extra: Dict[str, Any] | None = None) -> Dict[str, Any] | None:
     """Build a telemetry payload. Returns None if opt-in is off.
-
     No data is transmitted - this just structures the payload for
     future use (log shipping, etc.). All fields are non-personal.
     """
     if not is_enabled():
         logger.debug("Telemetry disabled; skipping event '{}'.", event)
         return None
-
     payload: Dict[str, Any] = {
         "event": event,
         "version": app.__version__,
