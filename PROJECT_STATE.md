@@ -1,8 +1,8 @@
 # WinForge Project State
 
 ## Metadata
-- **Version:** 0.4.0
-- **Phase:** Telemetry Opt-In Complete
+- **Version:** 0.5.0
+- **Phase:** Plugin Install/Uninstall Complete
 - **Last Updated:** 2026-04-29
 - **Tech Stack:** Python 3.11 + CustomTkinter + loguru + tufup + PyInstaller
 - **Repo:** https://github.com/051-lab/WinForge
@@ -19,15 +19,18 @@
 | Bundled Hello plugin | Done | plugins/hello - example with full metadata |
 | Telemetry opt-in system | Done | Privacy-first, UUID install_id, opt-in toggle |
 | Privacy tab UI | Done | CTkSwitch toggle, status label, consent saved |
+| Plugin enable/disable | Done | Per-plugin toggle with registry persistence |
+| Plugin uninstall | Done | Archives plugin folder, removes from registry |
+| Installer UI | Done | Enable/Disable + Uninstall buttons per card |
 | CI/CD pipeline | Done | GitHub Actions windows-latest |
-| Tests (18 passing) | Done | pytest: 4 updater + 3 plugin + 5 telemetry + 6 core |
+| Tests (24 passing) | Done | pytest: 4 updater + 3 plugin + 5 telemetry + 6 installer + 6 core |
 
 ## Current Issues
-- None known in v0.4.0
+- None known in v0.5.0
 
 ## Next Milestones
-1. **v0.5.0** - Plugin install/uninstall from marketplace
-2. **v0.6.0** - Settings UI panel with persistent user preferences
+1. **v0.6.0** - Settings UI panel with persistent user preferences
+2. **v0.7.0** - Plugin sandboxing and permissions model
 
 ## Dependencies
 ```
@@ -38,4 +41,4 @@ pyinstaller>=6.0
 ```
 
 ## AI Resume Block
-- Next task: Implement plugin install/uninstall from marketplace (v0.5.0)
+- Next task: Implement Settings UI panel with persistent user preferences (v0.6.0)
