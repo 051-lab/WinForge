@@ -4,6 +4,8 @@ PLUGIN_NAME = "Hello World"
 PLUGIN_VERSION = "1.0.0"
 PLUGIN_DESCRIPTION = "A simple hello-world plugin bundled with WinForge."
 PLUGIN_AUTHOR = "051-lab"
+PLUGIN_PERMISSIONS = ["ui:read"]
+
 
 
 def run():
