@@ -48,5 +48,38 @@ def discover_plugins() -> List[PluginInfo]:
                 info.name, info.version, info.permissions.granted,
             )
         except Exception as exc:
+
+            
+def install_plugin_from_registry(plugin_id: str, plugins_path: str) -> bool:
+    """Install a plugin from the remote registry.
+    
+    Args:
+        plugin_id: Unique identifier for the plugin in registry
+        plugins_path: Path to plugins directory
+    
+    Returns:
+        True if installation successful, False otherwise
+    """
+    from app.registry import PluginRegistry
+    import os
+    
+    registry = PluginRegistry()
+    plugin_meta = registry.get_plugin(plugin_id)
+    
+    if not plugin_meta:
+        logger.error(f"Plugin {plugin_id} not found in registry")
+        return False
+    
+    # Create destination path
+    plugin_filename = plugin_meta.get("filename", f"{plugin_id}.py")
+    dest_path = os.path.join(plugins_path, plugin_filename)
+    
+    # Download the plugin
+    if registry.download_plugin(plugin_id, dest_path):
+        logger.info(f"Successfully installed plugin {plugin_id}")
+        return True
+    else:
+        logger.error(f"Failed to install plugin {plugin_id}")
+        return False
             logger.warning("Failed to load plugin {}: {}", name, exc)
     return found
