@@ -229,3 +229,64 @@ def test_installer_list_enabled(tmp_path, monkeypatch):
     assert "alpha" in enabled
     assert "beta" in enabled
     assert "gamma" not in enabled
+
+
+# --- Settings panel tests ---
+
+
+def test_load_preferences_defaults(tmp_path, monkeypatch):
+    """load_preferences returns sensible defaults when no file exists."""
+    import app.settings_panel as sp
+    monkeypatch.setattr(sp, "_SETTINGS_FILE", tmp_path / "settings.json")
+    prefs = sp.load_preferences()
+    assert prefs["theme"] == "dark"
+    assert prefs["window_width"] == 900
+    assert prefs["window_height"] == 650
+    assert prefs["telemetry_enabled"] is False
+
+
+def test_save_and_reload_preferences(tmp_path, monkeypatch):
+    """Saved preferences round-trip correctly through load_preferences."""
+    import app.settings_panel as sp
+    settings_file = tmp_path / "settings.json"
+    monkeypatch.setattr(sp, "_SETTINGS_FILE", settings_file)
+    prefs = sp.load_preferences()
+    prefs["theme"] = "light"
+    prefs["window_width"] = 1200
+    prefs["window_height"] = 800
+    sp.save_preferences(prefs)
+    assert settings_file.exists()
+    reloaded = sp.load_preferences()
+    assert reloaded["theme"] == "light"
+    assert reloaded["window_width"] == 1200
+    assert reloaded["window_height"] == 800
+
+
+def test_save_preferences_creates_parent_dir(tmp_path, monkeypatch):
+    """save_preferences creates the config directory if it does not exist."""
+    import app.settings_panel as sp
+    nested = tmp_path / "a" / "b" / "settings.json"
+    monkeypatch.setattr(sp, "_SETTINGS_FILE", nested)
+    sp.save_preferences({"theme": "system"})
+    assert nested.exists()
+    data = json.loads(nested.read_text())
+    assert data["theme"] == "system"
+
+
+def test_load_preferences_merges_with_defaults(tmp_path, monkeypatch):
+    """Partial stored prefs are merged with defaults so all keys are present."""
+    import app.settings_panel as sp
+    settings_file = tmp_path / "settings.json"
+    monkeypatch.setattr(sp, "_SETTINGS_FILE", settings_file)
+    # Write only one key
+    settings_file.write_text(json.dumps({"theme": "light"}))
+    prefs = sp.load_preferences()
+    assert prefs["theme"] == "light"
+    assert "window_width" in prefs
+    assert "window_height" in prefs
+
+
+def test_app_version_bumped_to_0_6_0():
+    """Version must be 0.6.0 for the Settings UI milestone."""
+    from app import __version__
+    assert __version__ == "0.6.0"
