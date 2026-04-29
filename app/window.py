@@ -1,5 +1,6 @@
 """WinForge main window UI."""
 from __future__ import annotations
+
 import threading
 import webbrowser
 
@@ -16,6 +17,7 @@ from app.installer import (
     disable_plugin,
     uninstall_plugin,
 )
+from app.settings_panel import SettingsPanel, load_preferences
 
 
 class WinForgeApp(ctk.CTk):
@@ -23,8 +25,12 @@ class WinForgeApp(ctk.CTk):
         super().__init__()
         self.config_obj = config
         self.title(f"WinForge v{__version__}")
-        self.geometry("900x650")
-        ctk.set_appearance_mode("dark")
+        # Apply persisted geometry before building UI
+        prefs = load_preferences()
+        w = prefs.get("window_width", 900)
+        h = prefs.get("window_height", 650)
+        self.geometry(f"{w}x{h}")
+        ctk.set_appearance_mode(prefs.get("theme", "dark"))
         self._build_ui()
 
     def _build_ui(self):
@@ -35,10 +41,12 @@ class WinForgeApp(ctk.CTk):
         self.tabs.add("Home")
         self.tabs.add("Marketplace")
         self.tabs.add("Privacy")
+        self.tabs.add("Settings")
 
         self._build_home_tab()
         self._build_marketplace_tab()
         self._build_privacy_tab()
+        self._build_settings_tab()
         logger.info("UI initialized")
 
     # ------------------------------------------------------------------
@@ -94,91 +102,60 @@ class WinForgeApp(ctk.CTk):
 
     def _add_plugin_card(self, info):
         """Render a plugin card with Enable/Disable and Uninstall controls."""
-        # Use folder name (module name) as the key for installer operations
         folder_name = info.module.__name__.split(".")[-1] if info.module else info.name.lower()
         enabled = is_plugin_enabled(folder_name)
-
         card = ctk.CTkFrame(self.plugin_frame, corner_radius=8)
         card.pack(fill="x", padx=8, pady=6)
-
         # Left side: metadata
         meta_frame = ctk.CTkFrame(card, fg_color="transparent")
         meta_frame.pack(side="left", fill="both", expand=True, padx=12, pady=10)
-
         name_lbl = ctk.CTkLabel(
-            meta_frame,
-            text=f"{info.name} v{info.version}",
-            font=("Arial", 14, "bold"),
-            anchor="w",
+            meta_frame, text=f"{info.name} v{info.version}", font=("Arial", 14, "bold"), anchor="w",
         )
         name_lbl.pack(anchor="w")
-
         desc_lbl = ctk.CTkLabel(
-            meta_frame,
-            text=info.description or "No description provided.",
-            font=("Arial", 11),
-            anchor="w",
-            text_color="gray",
+            meta_frame, text=info.description or "No description provided.",
+            font=("Arial", 11), anchor="w", text_color="gray",
         )
         desc_lbl.pack(anchor="w")
-
         author_lbl = ctk.CTkLabel(
-            meta_frame,
-            text=f"by {info.author}",
-            font=("Arial", 10),
-            anchor="w",
-            text_color="#888888",
+            meta_frame, text=f"by {info.author}", font=("Arial", 10), anchor="w", text_color="#888888",
         )
         author_lbl.pack(anchor="w")
-
         # Right side: action buttons
         btn_frame = ctk.CTkFrame(card, fg_color="transparent")
         btn_frame.pack(side="right", padx=12, pady=10)
-
-        # Enable/Disable toggle button
         toggle_text = "Disable" if enabled else "Enable"
         toggle_color = "#555555" if enabled else "#2a7a2a"
         status_lbl = ctk.CTkLabel(
             btn_frame,
-            text="● Enabled" if enabled else "○ Disabled",
+            text="\u25cf Enabled" if enabled else "\u25cb Disabled",
             font=("Arial", 10),
             text_color="#4caf50" if enabled else "#888888",
         )
         status_lbl.pack(pady=(0, 4))
-
         toggle_btn = ctk.CTkButton(
-            btn_frame,
-            text=toggle_text,
-            width=90,
-            fg_color=toggle_color,
-            command=lambda fn=folder_name, sl=status_lbl, tb=None: None,  # placeholder
+            btn_frame, text=toggle_text, width=90, fg_color=toggle_color,
+            command=lambda fn=folder_name, sl=status_lbl, tb=None: None,
         )
-
         def make_toggle(fn, sl, tb_ref):
             def _toggle():
                 currently = is_plugin_enabled(fn)
                 if currently:
                     disable_plugin(fn)
-                    sl.configure(text="○ Disabled", text_color="#888888")
+                    sl.configure(text="\u25cb Disabled", text_color="#888888")
                     tb_ref[0].configure(text="Enable", fg_color="#2a7a2a")
                 else:
                     enable_plugin(fn)
-                    sl.configure(text="● Enabled", text_color="#4caf50")
+                    sl.configure(text="\u25cf Enabled", text_color="#4caf50")
                     tb_ref[0].configure(text="Disable", fg_color="#555555")
                 logger.info("Plugin '{}' toggled", fn)
             return _toggle
-
         tb_ref = [toggle_btn]
         toggle_btn.configure(command=make_toggle(folder_name, status_lbl, tb_ref))
         toggle_btn.pack(pady=2)
-
-        # Uninstall button
         uninstall_btn = ctk.CTkButton(
-            btn_frame,
-            text="Uninstall",
-            width=90,
-            fg_color="#8b0000",
-            hover_color="#cc0000",
+            btn_frame, text="Uninstall", width=90, fg_color="#8b0000", hover_color="#cc0000",
             command=lambda fn=folder_name: self._confirm_uninstall(fn),
         )
         uninstall_btn.pack(pady=2)
@@ -189,7 +166,6 @@ class WinForgeApp(ctk.CTk):
         dialog.title("Confirm Uninstall")
         dialog.geometry("380x160")
         dialog.grab_set()
-
         msg = ctk.CTkLabel(
             dialog,
             text=f"Uninstall plugin '{folder_name}'?\nIt will be archived and removed from the marketplace.",
@@ -197,10 +173,8 @@ class WinForgeApp(ctk.CTk):
             justify="center",
         )
         msg.pack(pady=20)
-
         btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
         btn_row.pack(pady=5)
-
         def _do_uninstall():
             dialog.destroy()
             success = uninstall_plugin(folder_name)
@@ -209,9 +183,8 @@ class WinForgeApp(ctk.CTk):
                 logger.info("Uninstalled plugin: {}", folder_name)
             else:
                 logger.warning("Uninstall failed for: {}", folder_name)
-
-        ctk.CTkButton(btn_row, text="Uninstall", fg_color="#8b0000",
-                      hover_color="#cc0000", command=_do_uninstall).pack(side="left", padx=8)
+        ctk.CTkButton(btn_row, text="Uninstall", fg_color="#8b0000", hover_color="#cc0000",
+                      command=_do_uninstall).pack(side="left", padx=8)
         ctk.CTkButton(btn_row, text="Cancel", command=dialog.destroy).pack(side="left", padx=8)
 
     # ------------------------------------------------------------------
@@ -221,7 +194,6 @@ class WinForgeApp(ctk.CTk):
         tab = self.tabs.tab("Privacy")
         header = ctk.CTkLabel(tab, text="Privacy & Telemetry", font=("Arial", 20, "bold"))
         header.pack(pady=(20, 5))
-
         desc = ctk.CTkLabel(
             tab,
             text=(
@@ -233,7 +205,6 @@ class WinForgeApp(ctk.CTk):
             justify="center",
         )
         desc.pack(pady=(0, 20))
-
         self._telemetry_var = ctk.BooleanVar(value=is_enabled())
         self.telemetry_switch = ctk.CTkSwitch(
             tab,
@@ -243,7 +214,6 @@ class WinForgeApp(ctk.CTk):
             font=("Arial", 13),
         )
         self.telemetry_switch.pack(pady=10)
-
         self.telemetry_status_label = ctk.CTkLabel(
             tab,
             text=self._telemetry_status_text(),
@@ -251,7 +221,6 @@ class WinForgeApp(ctk.CTk):
             text_color="gray",
         )
         self.telemetry_status_label.pack(pady=5)
-
         privacy_note = ctk.CTkLabel(
             tab,
             text="Your choice is saved locally and never shared without your consent.",
@@ -268,6 +237,26 @@ class WinForgeApp(ctk.CTk):
         set_enabled(new_value)
         self.telemetry_status_label.configure(text=self._telemetry_status_text())
         logger.info("Telemetry toggled to: {}", new_value)
+
+    # ------------------------------------------------------------------
+    # Settings tab
+    # ------------------------------------------------------------------
+    def _build_settings_tab(self):
+        tab = self.tabs.tab("Settings")
+        self.settings_panel = SettingsPanel(
+            tab,
+            apply_callback=self._on_settings_applied,
+            fg_color="transparent",
+        )
+        self.settings_panel.pack(fill="both", expand=True)
+
+    def _on_settings_applied(self, prefs: dict) -> None:
+        """React to saved settings: resize window and re-apply appearance."""
+        w = prefs.get("window_width", 900)
+        h = prefs.get("window_height", 650)
+        self.geometry(f"{w}x{h}")
+        ctk.set_appearance_mode(prefs.get("theme", "dark"))
+        logger.info("Window updated to {}x{} theme={}", w, h, prefs.get("theme"))
 
     # ------------------------------------------------------------------
     # Update checker
@@ -294,4 +283,4 @@ class WinForgeApp(ctk.CTk):
             self.update_result_label.configure(
                 text="Up to date", text_color="green", cursor=""
             )
-        self.update_result_label.unbind("<Button-1>")
+            self.update_result_label.unbind("<Button-1>")
