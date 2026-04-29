@@ -1,7 +1,7 @@
 """Tests for WinForge app."""
 import io
 import json
-import tempfile
+import shutil
 import urllib.error
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -37,7 +37,7 @@ def test_telemetry_enabled_flag_in_features():
 
 def test_app_version():
     from app import __version__
-    assert __version__ == "0.4.0"
+    assert __version__ == "0.5.0"
 
 
 def test_config_load():
@@ -59,21 +59,21 @@ def _make_response(payload: dict):
 
 def test_updater_up_to_date():
     from app.updater import check_for_updates
-    payload = {"tag_name": "v0.4.0", "html_url": "https://github.com/051-lab/WinForge/releases/tag/v0.4.0"}
+    payload = {"tag_name": "v0.5.0", "html_url": "https://github.com/051-lab/WinForge/releases/tag/v0.5.0"}
     with patch("urllib.request.urlopen", return_value=_make_response(payload)):
         result = check_for_updates()
     assert result.available is False
-    assert result.current == result.latest == "0.4.0"
+    assert result.current == result.latest == "0.5.0"
 
 
 def test_updater_update_available():
     from app.updater import check_for_updates
-    payload = {"tag_name": "v0.5.0", "html_url": "https://github.com/051-lab/WinForge/releases/tag/v0.5.0"}
+    payload = {"tag_name": "v0.6.0", "html_url": "https://github.com/051-lab/WinForge/releases/tag/v0.6.0"}
     with patch("urllib.request.urlopen", return_value=_make_response(payload)):
         result = check_for_updates()
     assert result.available is True
-    assert result.latest == "0.5.0"
-    assert "v0.5.0" in result.url
+    assert result.latest == "0.6.0"
+    assert "v0.6.0" in result.url
 
 
 def test_updater_network_error():
@@ -162,3 +162,70 @@ def test_telemetry_collect_event_enabled(tmp_path, monkeypatch):
     assert payload["event"] == "app_start"
     assert "install_id" in payload
     assert payload["extra"] == "data"
+
+
+# --- Installer tests ---
+def test_installer_enabled_by_default(tmp_path, monkeypatch):
+    """Plugins not in registry are enabled by default."""
+    import app.installer as inst
+    monkeypatch.setattr(inst, "_REGISTRY_FILE", tmp_path / "plugins.json")
+    assert inst.is_plugin_enabled("my_plugin") is True
+
+
+def test_installer_disable_plugin(tmp_path, monkeypatch):
+    """disable_plugin persists disabled state to registry."""
+    import app.installer as inst
+    monkeypatch.setattr(inst, "_REGISTRY_FILE", tmp_path / "plugins.json")
+    inst.disable_plugin("my_plugin")
+    assert inst.is_plugin_enabled("my_plugin") is False
+
+
+def test_installer_enable_plugin(tmp_path, monkeypatch):
+    """enable_plugin re-enables a previously disabled plugin."""
+    import app.installer as inst
+    monkeypatch.setattr(inst, "_REGISTRY_FILE", tmp_path / "plugins.json")
+    inst.disable_plugin("my_plugin")
+    inst.enable_plugin("my_plugin")
+    assert inst.is_plugin_enabled("my_plugin") is True
+
+
+def test_installer_uninstall_missing_plugin(tmp_path, monkeypatch):
+    """uninstall_plugin returns False when the plugin folder does not exist."""
+    import app.installer as inst
+    monkeypatch.setattr(inst, "_REGISTRY_FILE", tmp_path / "plugins.json")
+    monkeypatch.setattr(inst, "_PLUGINS_DIR", tmp_path / "plugins")
+    result = inst.uninstall_plugin("nonexistent_plugin")
+    assert result is False
+
+
+def test_installer_uninstall_existing_plugin(tmp_path, monkeypatch):
+    """uninstall_plugin moves plugin folder to archive and returns True."""
+    import app.installer as inst
+    monkeypatch.setattr(inst, "_REGISTRY_FILE", tmp_path / "plugins.json")
+    plugins_dir = tmp_path / "plugins"
+    archive_dir = tmp_path / "plugins" / "_uninstalled"
+    monkeypatch.setattr(inst, "_PLUGINS_DIR", plugins_dir)
+    monkeypatch.setattr(inst, "_ARCHIVE_DIR", archive_dir)
+
+    # Create a fake plugin folder
+    fake_plugin = plugins_dir / "test_plugin"
+    fake_plugin.mkdir(parents=True)
+    (fake_plugin / "__init__.py").write_text("PLUGIN_NAME = 'Test'")
+
+    result = inst.uninstall_plugin("test_plugin")
+    assert result is True
+    assert not fake_plugin.exists()
+    assert (archive_dir / "test_plugin").exists()
+
+
+def test_installer_list_enabled(tmp_path, monkeypatch):
+    """list_enabled_plugins returns only plugins marked as enabled."""
+    import app.installer as inst
+    monkeypatch.setattr(inst, "_REGISTRY_FILE", tmp_path / "plugins.json")
+    inst.enable_plugin("alpha")
+    inst.enable_plugin("beta")
+    inst.disable_plugin("gamma")
+    enabled = inst.list_enabled_plugins()
+    assert "alpha" in enabled
+    assert "beta" in enabled
+    assert "gamma" not in enabled
