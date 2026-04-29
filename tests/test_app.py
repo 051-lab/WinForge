@@ -30,7 +30,7 @@ def test_feature_flags_present():
 
 def test_app_version():
     from app import __version__
-    assert __version__ == "0.2.0"
+    assert __version__ == "0.3.0"
 
 
 def test_config_load():
@@ -53,21 +53,21 @@ def _make_response(payload: dict):
 
 def test_updater_up_to_date():
     from app.updater import check_for_updates
-    payload = {"tag_name": "v0.2.0", "html_url": "https://github.com/051-lab/WinForge/releases/tag/v0.2.0"}
+    payload = {"tag_name": "v0.3.0", "html_url": "https://github.com/051-lab/WinForge/releases/tag/v0.3.0"}
     with patch("urllib.request.urlopen", return_value=_make_response(payload)):
         result = check_for_updates()
     assert result.available is False
-    assert result.current == result.latest == "0.2.0"
+    assert result.current == result.latest == "0.3.0"
 
 
 def test_updater_update_available():
     from app.updater import check_for_updates
-    payload = {"tag_name": "v0.3.0", "html_url": "https://github.com/051-lab/WinForge/releases/tag/v0.3.0"}
+    payload = {"tag_name": "v0.4.0", "html_url": "https://github.com/051-lab/WinForge/releases/tag/v0.4.0"}
     with patch("urllib.request.urlopen", return_value=_make_response(payload)):
         result = check_for_updates()
     assert result.available is True
-    assert result.latest == "0.3.0"
-    assert "v0.3.0" in result.url
+    assert result.latest == "0.4.0"
+    assert "v0.4.0" in result.url
 
 
 def test_updater_network_error():
@@ -86,3 +86,27 @@ def test_updater_malformed_json():
     with patch("urllib.request.urlopen", return_value=mock_resp):
         result = check_for_updates()
     assert result.available is False
+
+
+# --- Plugin marketplace tests ---
+
+def test_discover_plugins_returns_list():
+    from app.plugins import discover_plugins
+    plugins = discover_plugins()
+    assert isinstance(plugins, list)
+
+
+def test_hello_plugin_discovered():
+    from app.plugins import discover_plugins
+    plugins = discover_plugins()
+    names = [p.name for p in plugins]
+    assert "Hello World" in names
+
+
+def test_hello_plugin_metadata():
+    from app.plugins import discover_plugins
+    plugins = discover_plugins()
+    hello = next(p for p in plugins if p.name == "Hello World")
+    assert hello.version == "1.0.0"
+    assert hello.author == "051-lab"
+    assert "hello" in hello.description.lower()
