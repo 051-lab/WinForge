@@ -1,8 +1,8 @@
 # WinForge Project State
 
 ## Metadata
-- **Version:** 0.3.0
-- **Phase:** Plugin Marketplace Complete
+- **Version:** 0.4.0
+- **Phase:** Telemetry Opt-In Complete
 - **Last Updated:** 2026-04-29
 - **Tech Stack:** Python 3.11 + CustomTkinter + loguru + tufup + PyInstaller
 - **Repo:** https://github.com/051-lab/WinForge
@@ -17,15 +17,17 @@
 | Update UI button | Done | Threaded check, green/yellow result label |
 | Plugin Marketplace UI | Done | Tabbed UI, scrollable cards, Refresh button |
 | Bundled Hello plugin | Done | plugins/hello - example with full metadata |
+| Telemetry opt-in system | Done | Privacy-first, UUID install_id, opt-in toggle |
+| Privacy tab UI | Done | CTkSwitch toggle, status label, consent saved |
 | CI/CD pipeline | Done | GitHub Actions windows-latest |
-| Tests (13 passing) | Done | pytest: 4 updater + 3 plugin marketplace tests |
+| Tests (18 passing) | Done | pytest: 4 updater + 3 plugin + 5 telemetry + 6 core |
 
 ## Current Issues
-- None known in v0.3.0
+- None known in v0.4.0
 
 ## Next Milestones
-1. **v0.4.0** - Add telemetry opt-in system with privacy controls
-2. **v0.5.0** - Plugin install/uninstall from marketplace
+1. **v0.5.0** - Plugin install/uninstall from marketplace
+2. **v0.6.0** - Settings UI panel with persistent user preferences
 
 ## Dependencies
 ```
@@ -36,4 +38,4 @@ pyinstaller>=6.0
 ```
 
 ## AI Resume Block
-- Next task: Implement telemetry opt-in system with privacy controls (v0.4.0)
+- Next task: Implement plugin install/uninstall from marketplace (v0.5.0)
