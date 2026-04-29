@@ -292,3 +292,98 @@ def test_app_version_bumped_to_0_6_0():
     """Version must be 0.6.0 for the Settings UI milestone."""
     from app import __version__
     assert __version__ == "0.6.0"
+
+
+# --- Sandbox/permissions tests ---
+
+
+def test_sandbox_load_permissions_empty():
+    """load_permissions returns empty PluginPermissions when module has no PLUGIN_PERMISSIONS."""
+    from types import ModuleType
+    from app.sandbox import load_permissions
+    fake_mod = ModuleType("fake_plugin")
+    perms = load_permissions(fake_mod)
+    assert perms.granted == []
+    assert perms.unknown == []
+    assert perms.has_sensitive is False
+
+
+def test_sandbox_load_permissions_valid():
+    """load_permissions loads known permission tokens from PLUGIN_PERMISSIONS."""
+    from types import ModuleType
+    from app.sandbox import load_permissions
+    fake_mod = ModuleType("fake_plugin")
+    fake_mod.PLUGIN_PERMISSIONS = ["ui:read", "fs:read"]
+    fake_mod.PLUGIN_NAME = "Fake"
+    perms = load_permissions(fake_mod)
+    assert "ui:read" in perms.granted
+    assert "fs:read" in perms.granted
+    assert perms.unknown == []
+
+
+def test_sandbox_load_permissions_unknown():
+    """Unknown tokens in PLUGIN_PERMISSIONS are collected in perms.unknown."""
+    from types import ModuleType
+    from app.sandbox import load_permissions
+    fake_mod = ModuleType("fake_plugin")
+    fake_mod.PLUGIN_PERMISSIONS = ["ui:read", "bogus:hack"]
+    fake_mod.PLUGIN_NAME = "Fake"
+    perms = load_permissions(fake_mod)
+    assert "ui:read" in perms.granted
+    assert "bogus:hack" in perms.unknown
+
+
+def test_sandbox_is_allowed():
+    """PluginPermissions.is_allowed returns True only for granted tokens."""
+    from app.sandbox import PluginPermissions
+    perms = PluginPermissions(granted=["ui:read", "fs:write"])
+    assert perms.is_allowed("ui:read") is True
+    assert perms.is_allowed("fs:write") is True
+    assert perms.is_allowed("network:fetch") is False
+
+
+def test_sandbox_sensitive_list():
+    """sensitive_list returns the subset of granted tokens that are sensitive."""
+    from app.sandbox import PluginPermissions
+    perms = PluginPermissions(
+        granted=["ui:read", "fs:write", "network:fetch", "clipboard:read"]
+    )
+    sensitive = perms.sensitive_list()
+    assert "ui:read" not in sensitive
+    assert "fs:write" in sensitive
+    assert "network:fetch" in sensitive
+    assert "clipboard:read" in sensitive
+
+
+def test_sandbox_enforce_allowed():
+    """enforce() does not raise when the token is in granted."""
+    from app.sandbox import PluginPermissions, enforce
+    perms = PluginPermissions(granted=["ui:read"])
+    enforce(perms, "TestPlugin", "ui:read")  # Should not raise
+
+
+def test_sandbox_enforce_violation():
+    """enforce() raises SandboxViolation when the token is not granted."""
+    from app.sandbox import PluginPermissions, SandboxViolation, enforce
+    perms = PluginPermissions(granted=["ui:read"])
+    try:
+        enforce(perms, "TestPlugin", "fs:write")
+        assert False, "Expected SandboxViolation"
+    except SandboxViolation as e:
+        assert e.plugin_name == "TestPlugin"
+        assert e.token == "fs:write"
+
+
+def test_hello_plugin_has_permissions():
+    """Hello plugin declares ui:read permission."""
+    from app.plugins import discover_plugins
+    plugins = discover_plugins()
+    hello = next((p for p in plugins if p.name == "Hello World"), None)
+    assert hello is not None
+    assert "ui:read" in hello.permissions.granted
+
+
+def test_app_version_bumped_to_0_7_0():
+    """Version must be 0.7.0 for the plugin sandboxing milestone."""
+    from app import __version__
+    assert __version__ == "0.7.0"
