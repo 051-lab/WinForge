@@ -37,7 +37,7 @@ def test_telemetry_enabled_flag_in_features():
 
 def test_app_version():
     from app import __version__
-    assert __version__ == "0.5.0"
+    assert __version__ == "0.6.0"
 
 
 def test_config_load():
@@ -59,21 +59,27 @@ def _make_response(payload: dict):
 
 def test_updater_up_to_date():
     from app.updater import check_for_updates
-    payload = {"tag_name": "v0.5.0", "html_url": "https://github.com/051-lab/WinForge/releases/tag/v0.5.0"}
+    payload = {
+        "tag_name": "v0.6.0",
+        "html_url": "https://github.com/051-lab/WinForge/releases/tag/v0.6.0"
+    }
     with patch("urllib.request.urlopen", return_value=_make_response(payload)):
         result = check_for_updates()
     assert result.available is False
-    assert result.current == result.latest == "0.5.0"
+    assert result.current == result.latest == "0.6.0"
 
 
 def test_updater_update_available():
     from app.updater import check_for_updates
-    payload = {"tag_name": "v0.6.0", "html_url": "https://github.com/051-lab/WinForge/releases/tag/v0.6.0"}
+    payload = {
+        "tag_name": "v0.7.0",
+        "html_url": "https://github.com/051-lab/WinForge/releases/tag/v0.7.0"
+    }
     with patch("urllib.request.urlopen", return_value=_make_response(payload)):
         result = check_for_updates()
     assert result.available is True
-    assert result.latest == "0.6.0"
-    assert "v0.6.0" in result.url
+    assert result.latest == "0.7.0"
+    assert "v0.7.0" in result.url
 
 
 def test_updater_network_error():
@@ -206,12 +212,9 @@ def test_installer_uninstall_existing_plugin(tmp_path, monkeypatch):
     archive_dir = tmp_path / "plugins" / "_uninstalled"
     monkeypatch.setattr(inst, "_PLUGINS_DIR", plugins_dir)
     monkeypatch.setattr(inst, "_ARCHIVE_DIR", archive_dir)
-
-    # Create a fake plugin folder
     fake_plugin = plugins_dir / "test_plugin"
     fake_plugin.mkdir(parents=True)
     (fake_plugin / "__init__.py").write_text("PLUGIN_NAME = 'Test'")
-
     result = inst.uninstall_plugin("test_plugin")
     assert result is True
     assert not fake_plugin.exists()
@@ -278,7 +281,6 @@ def test_load_preferences_merges_with_defaults(tmp_path, monkeypatch):
     import app.settings_panel as sp
     settings_file = tmp_path / "settings.json"
     monkeypatch.setattr(sp, "_SETTINGS_FILE", settings_file)
-    # Write only one key
     settings_file.write_text(json.dumps({"theme": "light"}))
     prefs = sp.load_preferences()
     assert prefs["theme"] == "light"
