@@ -1,8 +1,8 @@
 # WinForge Project State
 
 ## Metadata
-- **Version:** 0.6.0
-- **Phase:** Settings UI Panel Complete
+- **Version:** 0.7.0
+- **Phase:** Plugin Sandboxing Complete
 - **Last Updated:** 2026-04-29
 - **Tech Stack:** Python 3.11 + CustomTkinter + loguru + tufup + PyInstaller
 - **Repo:** https://github.com/051-lab/WinForge
@@ -23,17 +23,19 @@
 | Plugin uninstall | Done | Archives plugin folder, removes from registry |
 | Installer UI | Done | Enable/Disable + Uninstall buttons per card |
 | Settings UI panel | Done | Theme, window size, telemetry toggle, persistent prefs |
+| Plugin sandboxing | Done | Permissions manifest (PLUGIN_PERMISSIONS), enforcement layer |
+| Sandbox permissions | Done | 9 known tokens (ui:read, fs:write, network:fetch, etc.) |
 | CI/CD pipeline | Done | GitHub Actions windows-latest |
-| Tests (29 passing) | Done | pytest: 4 updater + 3 plugin + 5 telemetry + 6 installer + 6 core + 5 settings |
+| Tests (38 passing) | Done | pytest: 4 updater + 3 plugin + 5 telemetry + 6 installer + 6 core + 5 settings + 9 sandbox |
 
 ## Current Issues
-- None known in v0.6.0
+- None known in v0.7.0
 
 ## Next Milestones
-1. **v0.7.0** - Plugin sandboxing and permissions model
-2. **v0.8.0** - Plugin auto-install from remote registry
+1. **v0.8.0** - Plugin auto-install from remote registry
+2. **v0.9.0** - Real-time plugin status dashboard
 
 ## AI Resume Block
-- Next task: Implement plugin sandboxing and permissions model (v0.7.0)
+- Next task: Implement plugin auto-install from remote registry (v0.8.0)
 
-Current phase: v0.6.0 - Settings UI Panel Complete
+Current phase: v0.7.0 - Plugin Sandboxing Complete
