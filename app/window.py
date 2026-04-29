@@ -10,6 +10,12 @@ from app import __version__
 from app.plugins import discover_plugins
 from app.updater import check_for_updates
 from app.telemetry import is_enabled, set_enabled
+from app.installer import (
+    is_plugin_enabled,
+    enable_plugin,
+    disable_plugin,
+    uninstall_plugin,
+)
 
 
 class WinForgeApp(ctk.CTk):
@@ -60,7 +66,7 @@ class WinForgeApp(ctk.CTk):
         tab = self.tabs.tab("Marketplace")
         header = ctk.CTkLabel(tab, text="Plugin Marketplace", font=("Arial", 20, "bold"))
         header.pack(pady=(15, 5))
-        subtitle = ctk.CTkLabel(tab, text="Installed plugins discovered automatically", font=("Arial", 11))
+        subtitle = ctk.CTkLabel(tab, text="Manage installed plugins", font=("Arial", 11))
         subtitle.pack(pady=(0, 10))
         # Scrollable frame for plugin cards
         self.plugin_frame = ctk.CTkScrollableFrame(tab, label_text="")
@@ -87,31 +93,126 @@ class WinForgeApp(ctk.CTk):
             self._add_plugin_card(info)
 
     def _add_plugin_card(self, info):
+        """Render a plugin card with Enable/Disable and Uninstall controls."""
+        # Use folder name (module name) as the key for installer operations
+        folder_name = info.module.__name__.split(".")[-1] if info.module else info.name.lower()
+        enabled = is_plugin_enabled(folder_name)
+
         card = ctk.CTkFrame(self.plugin_frame, corner_radius=8)
         card.pack(fill="x", padx=8, pady=6)
+
+        # Left side: metadata
+        meta_frame = ctk.CTkFrame(card, fg_color="transparent")
+        meta_frame.pack(side="left", fill="both", expand=True, padx=12, pady=10)
+
         name_lbl = ctk.CTkLabel(
-            card,
+            meta_frame,
             text=f"{info.name} v{info.version}",
             font=("Arial", 14, "bold"),
             anchor="w",
         )
-        name_lbl.pack(anchor="w", padx=12, pady=(10, 2))
+        name_lbl.pack(anchor="w")
+
         desc_lbl = ctk.CTkLabel(
-            card,
+            meta_frame,
             text=info.description or "No description provided.",
             font=("Arial", 11),
             anchor="w",
             text_color="gray",
         )
-        desc_lbl.pack(anchor="w", padx=12, pady=(0, 2))
+        desc_lbl.pack(anchor="w")
+
         author_lbl = ctk.CTkLabel(
-            card,
+            meta_frame,
             text=f"by {info.author}",
             font=("Arial", 10),
             anchor="w",
             text_color="#888888",
         )
-        author_lbl.pack(anchor="w", padx=12, pady=(0, 10))
+        author_lbl.pack(anchor="w")
+
+        # Right side: action buttons
+        btn_frame = ctk.CTkFrame(card, fg_color="transparent")
+        btn_frame.pack(side="right", padx=12, pady=10)
+
+        # Enable/Disable toggle button
+        toggle_text = "Disable" if enabled else "Enable"
+        toggle_color = "#555555" if enabled else "#2a7a2a"
+        status_lbl = ctk.CTkLabel(
+            btn_frame,
+            text="● Enabled" if enabled else "○ Disabled",
+            font=("Arial", 10),
+            text_color="#4caf50" if enabled else "#888888",
+        )
+        status_lbl.pack(pady=(0, 4))
+
+        toggle_btn = ctk.CTkButton(
+            btn_frame,
+            text=toggle_text,
+            width=90,
+            fg_color=toggle_color,
+            command=lambda fn=folder_name, sl=status_lbl, tb=None: None,  # placeholder
+        )
+
+        def make_toggle(fn, sl, tb_ref):
+            def _toggle():
+                currently = is_plugin_enabled(fn)
+                if currently:
+                    disable_plugin(fn)
+                    sl.configure(text="○ Disabled", text_color="#888888")
+                    tb_ref[0].configure(text="Enable", fg_color="#2a7a2a")
+                else:
+                    enable_plugin(fn)
+                    sl.configure(text="● Enabled", text_color="#4caf50")
+                    tb_ref[0].configure(text="Disable", fg_color="#555555")
+                logger.info("Plugin '{}' toggled", fn)
+            return _toggle
+
+        tb_ref = [toggle_btn]
+        toggle_btn.configure(command=make_toggle(folder_name, status_lbl, tb_ref))
+        toggle_btn.pack(pady=2)
+
+        # Uninstall button
+        uninstall_btn = ctk.CTkButton(
+            btn_frame,
+            text="Uninstall",
+            width=90,
+            fg_color="#8b0000",
+            hover_color="#cc0000",
+            command=lambda fn=folder_name: self._confirm_uninstall(fn),
+        )
+        uninstall_btn.pack(pady=2)
+
+    def _confirm_uninstall(self, folder_name: str):
+        """Show a confirmation dialog before uninstalling a plugin."""
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Confirm Uninstall")
+        dialog.geometry("380x160")
+        dialog.grab_set()
+
+        msg = ctk.CTkLabel(
+            dialog,
+            text=f"Uninstall plugin '{folder_name}'?\nIt will be archived and removed from the marketplace.",
+            font=("Arial", 12),
+            justify="center",
+        )
+        msg.pack(pady=20)
+
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack(pady=5)
+
+        def _do_uninstall():
+            dialog.destroy()
+            success = uninstall_plugin(folder_name)
+            if success:
+                self._load_plugins()
+                logger.info("Uninstalled plugin: {}", folder_name)
+            else:
+                logger.warning("Uninstall failed for: {}", folder_name)
+
+        ctk.CTkButton(btn_row, text="Uninstall", fg_color="#8b0000",
+                      hover_color="#cc0000", command=_do_uninstall).pack(side="left", padx=8)
+        ctk.CTkButton(btn_row, text="Cancel", command=dialog.destroy).pack(side="left", padx=8)
 
     # ------------------------------------------------------------------
     # Privacy tab
@@ -133,7 +234,6 @@ class WinForgeApp(ctk.CTk):
         )
         desc.pack(pady=(0, 20))
 
-        # Toggle switch
         self._telemetry_var = ctk.BooleanVar(value=is_enabled())
         self.telemetry_switch = ctk.CTkSwitch(
             tab,
