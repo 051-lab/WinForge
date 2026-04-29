@@ -1,10 +1,10 @@
 """Tests for WinForge app."""
 import io
 import json
+import tempfile
 import urllib.error
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-
 import pytest
 
 
@@ -28,9 +28,16 @@ def test_feature_flags_present():
     assert "plugin_system" in feat
 
 
+def test_telemetry_enabled_flag_in_features():
+    with open("config/features.json") as f:
+        feat = json.load(f)
+    assert "telemetry_enabled" in feat
+    assert feat["telemetry_enabled"] is False
+
+
 def test_app_version():
     from app import __version__
-    assert __version__ == "0.3.0"
+    assert __version__ == "0.4.0"
 
 
 def test_config_load():
@@ -40,7 +47,6 @@ def test_config_load():
 
 
 # --- Updater tests ---
-
 def _make_response(payload: dict):
     """Build a mock urlopen context manager returning JSON bytes."""
     data = json.dumps(payload).encode()
@@ -53,21 +59,21 @@ def _make_response(payload: dict):
 
 def test_updater_up_to_date():
     from app.updater import check_for_updates
-    payload = {"tag_name": "v0.3.0", "html_url": "https://github.com/051-lab/WinForge/releases/tag/v0.3.0"}
+    payload = {"tag_name": "v0.4.0", "html_url": "https://github.com/051-lab/WinForge/releases/tag/v0.4.0"}
     with patch("urllib.request.urlopen", return_value=_make_response(payload)):
         result = check_for_updates()
     assert result.available is False
-    assert result.current == result.latest == "0.3.0"
+    assert result.current == result.latest == "0.4.0"
 
 
 def test_updater_update_available():
     from app.updater import check_for_updates
-    payload = {"tag_name": "v0.4.0", "html_url": "https://github.com/051-lab/WinForge/releases/tag/v0.4.0"}
+    payload = {"tag_name": "v0.5.0", "html_url": "https://github.com/051-lab/WinForge/releases/tag/v0.5.0"}
     with patch("urllib.request.urlopen", return_value=_make_response(payload)):
         result = check_for_updates()
     assert result.available is True
-    assert result.latest == "0.4.0"
-    assert "v0.4.0" in result.url
+    assert result.latest == "0.5.0"
+    assert "v0.5.0" in result.url
 
 
 def test_updater_network_error():
@@ -89,7 +95,6 @@ def test_updater_malformed_json():
 
 
 # --- Plugin marketplace tests ---
-
 def test_discover_plugins_returns_list():
     from app.plugins import discover_plugins
     plugins = discover_plugins()
@@ -110,3 +115,50 @@ def test_hello_plugin_metadata():
     assert hello.version == "1.0.0"
     assert hello.author == "051-lab"
     assert "hello" in hello.description.lower()
+
+
+# --- Telemetry tests ---
+def test_telemetry_disabled_by_default(tmp_path, monkeypatch):
+    """Telemetry must be opt-in; disabled unless explicitly enabled."""
+    import app.telemetry as tel
+    monkeypatch.setattr(tel, "_STATE_FILE", tmp_path / "telemetry.json")
+    assert tel.is_enabled() is False
+
+
+def test_telemetry_opt_in(tmp_path, monkeypatch):
+    """set_enabled(True) should persist consent and generate install_id."""
+    import app.telemetry as tel
+    monkeypatch.setattr(tel, "_STATE_FILE", tmp_path / "telemetry.json")
+    tel.set_enabled(True)
+    assert tel.is_enabled() is True
+    assert tel.get_install_id() is not None
+
+
+def test_telemetry_opt_out(tmp_path, monkeypatch):
+    """set_enabled(False) should disable telemetry and return no install_id."""
+    import app.telemetry as tel
+    monkeypatch.setattr(tel, "_STATE_FILE", tmp_path / "telemetry.json")
+    tel.set_enabled(True)
+    tel.set_enabled(False)
+    assert tel.is_enabled() is False
+    assert tel.get_install_id() is None
+
+
+def test_telemetry_collect_event_disabled(tmp_path, monkeypatch):
+    """collect_event returns None when telemetry is off."""
+    import app.telemetry as tel
+    monkeypatch.setattr(tel, "_STATE_FILE", tmp_path / "telemetry.json")
+    result = tel.collect_event("app_start")
+    assert result is None
+
+
+def test_telemetry_collect_event_enabled(tmp_path, monkeypatch):
+    """collect_event returns a payload dict when telemetry is on."""
+    import app.telemetry as tel
+    monkeypatch.setattr(tel, "_STATE_FILE", tmp_path / "telemetry.json")
+    tel.set_enabled(True)
+    payload = tel.collect_event("app_start", {"extra": "data"})
+    assert payload is not None
+    assert payload["event"] == "app_start"
+    assert "install_id" in payload
+    assert payload["extra"] == "data"
